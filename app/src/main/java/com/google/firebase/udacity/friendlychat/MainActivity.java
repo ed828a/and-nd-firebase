@@ -15,6 +15,7 @@
  */
 package com.google.firebase.udacity.friendlychat;
 
+import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -138,43 +139,17 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        mChildEventListener = new ChildEventListener() {
-            @Override
-            public void onChildAdded(DataSnapshot dataSnapshot, String s) {
-                FriendlyMessage newMessage = dataSnapshot.getValue(FriendlyMessage.class);
-                mMessageAdapter.add(newMessage);
-            }
 
-            @Override
-            public void onChildChanged(DataSnapshot dataSnapshot, String s) {
-                // nothing for now
-            }
-
-            @Override
-            public void onChildRemoved(DataSnapshot dataSnapshot) {
-                // nothing for now
-            }
-
-            @Override
-            public void onChildMoved(DataSnapshot dataSnapshot, String s) {
-                // nothing for now
-            }
-
-            @Override
-            public void onCancelled(DatabaseError databaseError) {
-                // nothing for now
-            }
-        };
-        mDatabaseMessageReference.addChildEventListener(mChildEventListener);
         mAuthStatelistener = new FirebaseAuth.AuthStateListener() {
             @Override
             public void onAuthStateChanged(@NonNull FirebaseAuth firebaseAuth) {
                 FirebaseUser user = firebaseAuth.getCurrentUser();
                 if (user != null) {
                     // user is signed in
-                    Toast.makeText(getApplicationContext(), "Welcome you come back again!", Toast.LENGTH_SHORT).show();
+                    onSignedInInitialize(user.getDisplayName());
                 } else {
                     // user isn't signed in
+                    onSignedOutCleanup();
                     startActivityForResult(
                             AuthUI.getInstance()
                                     .createSignInIntentBuilder()
@@ -212,6 +187,81 @@ public class MainActivity extends AppCompatActivity {
         super.onPause();
         if (mAuthStatelistener != null) {
             mFirebaseAuth.removeAuthStateListener(mAuthStatelistener);
+        }
+
+        detachDatabaseReadListener();
+        mMessageAdapter.clear();
+    }
+
+    private void onSignedInInitialize(String username ){
+        mUsername = username;
+        attachDatabaseReadListener();
+
+    }
+
+    private void onSignedOutCleanup(){
+        mUsername = ANONYMOUS;
+        mMessageAdapter.clear();
+        detachDatabaseReadListener();
+
+    }
+
+    private void attachDatabaseReadListener(){
+        if (mChildEventListener == null) {
+            mChildEventListener = new ChildEventListener() {
+                @Override
+                public void onChildAdded(DataSnapshot dataSnapshot, String s) {
+                    FriendlyMessage newMessage = dataSnapshot.getValue(FriendlyMessage.class);
+                    mMessageAdapter.add(newMessage);
+                }
+
+                @Override
+                public void onChildChanged(DataSnapshot dataSnapshot, String s) {
+                    // nothing for now
+                }
+
+                @Override
+                public void onChildRemoved(DataSnapshot dataSnapshot) {
+                    // nothing for now
+                }
+
+                @Override
+                public void onChildMoved(DataSnapshot dataSnapshot, String s) {
+                    // nothing for now
+                }
+
+                @Override
+                public void onCancelled(DatabaseError databaseError) {
+                    // nothing for now
+                }
+            };
+            mDatabaseMessageReference.addChildEventListener(mChildEventListener);
+        }
+    }
+
+    private void detachDatabaseReadListener(){
+        if (mChildEventListener != null) {
+            mDatabaseMessageReference.removeEventListener(mChildEventListener);
+            mChildEventListener = null;
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == RC_SIGN_IN){
+            switch(resultCode){
+                case RESULT_CANCELED:
+                    Toast.makeText(this, "Sign in canceled", Toast.LENGTH_SHORT).show();
+                    finish();
+                    break;
+
+                case RESULT_OK:
+                    Toast.makeText(this, "Sign in!", Toast.LENGTH_SHORT).show();
+                    break;
+
+                default: // do nothing for now
+            }
         }
     }
 }
